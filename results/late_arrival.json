@@ -1,0 +1,28 @@
+{
+  "static": {
+    "label": "static",
+    "engine": "static",
+    "max_seqs": 8,
+    "n_long": 8,
+    "long_tokens": 300,
+    "delay_s": 1.0,
+    "in_flight_at_send": 8,
+    "late_request_ttft_s": 8.5576,
+    "late_request_total_s": 8.6673,
+    "long_ttft_mean_s": 0.3397,
+    "long_total_max_s": 9.5229,
+    "wall_s": 9.6725,
+    "engine_stats": {
+      "engine": "static",
+      "pending": 0,
+      "running": 0,
+      "max_concurrent_seqs": 8,
+      "completed": 9,
+      "failed": 0,
+      "batches_run": 2,
+      "avg_batch_size": 4.5,
+      "decode_steps": 314,
+      "avg_slot_utilization": 0.9582
+    }
+  }
+}

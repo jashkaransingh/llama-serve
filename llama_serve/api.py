@@ -39,6 +39,7 @@ class GenerateRequest(BaseModel):
     repeat_penalty: float = Field(default=1.1, ge=0.0, le=2.0)
     seed: int = 0
     stop: list[str] = Field(default_factory=list)
+    ignore_eos: bool = Field(default=False, description="generate exactly max_tokens; for benchmarking")
     stream: bool = False
     priority: int = Field(default=0, description="lower value = higher priority")
 
@@ -51,6 +52,7 @@ class GenerateRequest(BaseModel):
             seed=self.seed,
             max_tokens=self.max_tokens,
             stop=tuple(self.stop),
+            ignore_eos=self.ignore_eos,
         ).normalized()
 
 

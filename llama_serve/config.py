@@ -31,6 +31,7 @@ class Config:
     max_seqs: int = 8  # concurrent KV sequence slots
     max_queue: int = 256
     prefill_chunk: int = 256  # max prompt tokens admitted per decode step
+    static_batch_wait_s: float = 0.02  # static engine: window to collect a batch
     block_size: int = 16  # paged KV block size, in tokens
 
     # scheduling

@@ -104,7 +104,9 @@ class SimpleEngine(Engine):
 
             pos = len(toks)
             eos = self.backend.eos_tokens
-            is_eog = getattr(self.backend, "is_eog", lambda t: t in eos)
+            is_eog = getattr(self.backend, "is_eog", None) or (lambda t: t in eos)
+            if req.params.ignore_eos:
+                is_eog = lambda t: False  # noqa: E731 - benchmarking mode
 
             for _ in range(req.params.max_tokens):
                 tok = sampler.sample(logits_index)

@@ -42,6 +42,10 @@ class SamplingParams:
     seed: int = 0
     max_tokens: int = 128
     stop: tuple[str, ...] = ()
+    # Benchmarking knob: forces an exact output length so measurements compare
+    # like with like. Without it a model that emits EOS early makes a "250
+    # token" load test secretly a 30-token one.
+    ignore_eos: bool = False
 
     def normalized(self) -> "SamplingParams":
         """Clamp values into ranges llama.cpp accepts."""
@@ -53,6 +57,7 @@ class SamplingParams:
             seed=int(self.seed),
             max_tokens=max(1, int(self.max_tokens)),
             stop=tuple(self.stop or ()),
+            ignore_eos=bool(self.ignore_eos),
         )
 
 
