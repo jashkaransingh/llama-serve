@@ -17,7 +17,7 @@ the repo says it is, with the command used to verify it.
 | 0 | Scaffolding, backend interface, mock backend | ✅ |
 | 1 | Baseline blocking server | ✅ |
 | 2 | Static batching | ✅ |
-| 3 | Continuous (iteration-level) batching | ⬜ |
+| 3 | Continuous (iteration-level) batching | ✅ |
 | 4 | Paged KV-cache allocator + prefix sharing | ⬜ |
 | 5 | Scheduling policy (priority + preemption) | ⬜ |
 | 6 | Observability (`/metrics`) | ⬜ |

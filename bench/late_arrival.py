@@ -1,20 +1,34 @@
 """Measures the one thing that separates static from continuous batching.
 
-Experiment: saturate the server with `--n-long` requests that each generate a
-long completion. Then, after `--delay` seconds — once those are unambiguously
-mid-generation — send one short request and measure its time-to-first-token.
+Experiment: saturate the server with long-running requests, wait `--delay`
+seconds so they are unambiguously mid-generation, then send one short request
+and measure its time-to-first-token.
 
-  static batching:     the late request cannot join the running batch. Its TTFT
-                       is bounded below by the *remaining* time of the longest
-                       request already in flight.
-  continuous batching: the late request joins at the next decode step. Its TTFT
-                       should be close to a single prefill.
+    static batching:     the late request cannot join a batch that has already
+                         started. Its TTFT is bounded below by the *remaining*
+                         time of the batch it missed.
+    continuous batching: the late request is folded into the next decode step,
+                         so its TTFT should be close to a bare prefill.
 
-Run it against both engines and compare. The absolute numbers are hardware
-specific; the ratio is the point.
+Two modes, because the honest answer differs between them:
 
-    python bench/late_arrival.py --label static
-    python bench/late_arrival.py --label continuous
+  --mode headroom  (default)  n_long = max_seqs - 1, leaving one free sequence
+                              slot. This isolates the scheduling difference:
+                              capacity exists, and the only question is whether
+                              the engine can hand it to a request that arrived
+                              late. Continuous can; static cannot.
+
+  --mode saturated            n_long = max_seqs, so every slot is occupied and
+                              all long requests are the same length. Continuous
+                              batching has nothing to exploit here — there is no
+                              free slot and no early finisher — and it should be
+                              reported as no better than static. Fixing *this*
+                              case needs preemption (milestone 5), not batching.
+
+Run against both engines and compare. Absolute numbers are hardware specific;
+the ratio within a mode is the point.
+
+    python bench/late_arrival.py --label static-headroom --mode headroom
 """
 
 from __future__ import annotations
@@ -51,9 +65,10 @@ async def _stream_ttft(client, payload) -> dict:
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://127.0.0.1:8000")
-    ap.add_argument("--label", required=True, help="engine name, for the results file")
-    ap.add_argument("--n-long", type=int, default=8)
-    ap.add_argument("--long-tokens", type=int, default=200)
+    ap.add_argument("--label", required=True, help="run name, used as the results key")
+    ap.add_argument("--mode", choices=["headroom", "saturated"], default="headroom")
+    ap.add_argument("--n-long", type=int, default=None, help="override; defaults from --mode")
+    ap.add_argument("--long-tokens", type=int, default=300)
     ap.add_argument("--short-tokens", type=int, default=16)
     ap.add_argument("--delay", type=float, default=1.0)
     ap.add_argument("--timeout", type=float, default=300.0)
@@ -62,32 +77,32 @@ async def main() -> int:
 
     async with httpx.AsyncClient(base_url=args.url, timeout=args.timeout) as c:
         health = (await c.get("/health")).json()
+        max_seqs = health["max_seqs"]
+        n_long = args.n_long
+        if n_long is None:
+            n_long = max_seqs - 1 if args.mode == "headroom" else max_seqs
         await c.post("/metrics/reset")
-        print(f"engine={health['engine']} max_seqs={health['max_seqs']}")
+        print(f"engine={health['engine']} max_seqs={max_seqs} mode={args.mode} n_long={n_long}")
 
         long_payload = {
             "prompt": "Write a long detailed essay about the history of maritime navigation.",
             "max_tokens": args.long_tokens,
             "temperature": 0.0,
-            # Force the exact length: TinyLlama emits EOS after ~30 tokens on
-            # this prompt, which would make the "long" requests short and the
-            # experiment meaningless.
+            # Pin the output length. TinyLlama emits EOS after ~30 tokens on
+            # this prompt, which would leave the late request nothing to wait
+            # for and make the whole experiment vacuous.
             "ignore_eos": True,
         }
-        short_payload = {
-            "prompt": "Say hello.",
-            "max_tokens": args.short_tokens,
-            "temperature": 0.0,
-        }
+        short_payload = {"prompt": "Say hello.", "max_tokens": args.short_tokens, "temperature": 0.0}
 
         t_start = time.perf_counter()
-        longs = [asyncio.create_task(_stream_ttft(c, long_payload)) for _ in range(args.n_long)]
+        longs = [asyncio.create_task(_stream_ttft(c, long_payload)) for _ in range(n_long)]
         await asyncio.sleep(args.delay)
 
-        # Confirm the long requests really are mid-flight before we measure.
+        # Confirm the long requests really are mid-flight before measuring.
         m = (await c.get("/metrics")).json()
         in_flight = m["requests"]["in_flight"]
-        print(f"t={time.perf_counter() - t_start:.2f}s: {in_flight} requests in flight; sending late request")
+        print(f"t={time.perf_counter() - t_start:.2f}s: {in_flight} in flight; sending late request")
 
         late = await _stream_ttft(c, short_payload)
         long_results = await asyncio.gather(*longs)
@@ -98,8 +113,9 @@ async def main() -> int:
     out = {
         "label": args.label,
         "engine": health["engine"],
-        "max_seqs": health["max_seqs"],
-        "n_long": args.n_long,
+        "mode": args.mode,
+        "max_seqs": max_seqs,
+        "n_long": n_long,
         "long_tokens": args.long_tokens,
         "delay_s": args.delay,
         "in_flight_at_send": in_flight,
