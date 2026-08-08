@@ -1,0 +1,21 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
+ignore = [
+    "E501",  # long lines are caught by the formatter's line-length, not worth failing on
+    "B008",  # FastAPI's Depends()/Field() idiom is a call in a default argument
+    "B027",  # Backend.close()/Sampler.close() are deliberately optional no-ops
+    "UP042", # (str, Enum) is load-bearing here: milestone 0-3 code and the JSON
+             # surface rely on the existing str semantics; StrEnum changes str()
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests reach into engine internals on purpose, to assert on placement.
+"tests/*" = ["SLF001"]

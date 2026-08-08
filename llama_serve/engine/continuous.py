@@ -39,7 +39,7 @@ from collections import deque
 from collections.abc import AsyncIterator
 
 from ..backends.base import TokenSlot
-from ._util import Emitter, SENTINEL, accept_token, check_stop, finish, is_stop_token
+from ._util import SENTINEL, Emitter, accept_token, check_stop, finish, is_stop_token
 from .base import ContextOverflow, Engine, QueueFull
 from .request import FinishReason, Request, Stage
 
@@ -76,8 +76,20 @@ class ContinuousBatchEngine(Engine):
         self.step_times: deque[float] = deque(maxlen=4000)
         self.admissions_mid_flight = 0
 
-        # milestone 4 hooks in here; None means "no paged allocator".
+        # Milestone 4: paged KV allocator + prefix cache. Donor sequence ids
+        # live beyond the running slots (max_seqs .. max_seqs+cache_seqs-1) so a
+        # cached prefix never consumes a slot a live request needs.
         self.block_manager = None
+        cache_seqs = getattr(backend, "cache_seqs", 0)
+        if config.enable_prefix_cache and cache_seqs > 0 and backend.supports_prefix_sharing:
+            from .block_manager import BlockManager
+
+            self.block_manager = BlockManager(
+                backend=backend,
+                block_size=config.block_size,
+                cache_seq_ids=list(range(self.max_seqs, self.max_seqs + cache_seqs)),
+                total_blocks=(config.n_ctx_per_seq * cache_seqs) // max(1, config.block_size),
+            )
 
     async def start(self) -> None:
         self._emitter = Emitter(asyncio.get_running_loop())
@@ -200,6 +212,8 @@ class ContinuousBatchEngine(Engine):
                 )
             req.n_computed += take
             budget -= take
+            if self.block_manager is not None:
+                self.block_manager.note_prefill(take)
             if is_final:
                 sample_targets.append((req, len(slots) - 1))
                 req.stage = Stage.DECODE

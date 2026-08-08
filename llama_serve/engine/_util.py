@@ -58,7 +58,7 @@ def eog_fn(backend):
     return getattr(backend, "is_eog", None) or (lambda t: t in eos)
 
 
-def is_stop_token(backend, req: Request) -> "callable":
+def is_stop_token(backend, req: Request) -> callable:
     """EOG predicate for one request, honouring `ignore_eos`."""
     base = eog_fn(backend)
     if req.params.ignore_eos:

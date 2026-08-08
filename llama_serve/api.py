@@ -13,7 +13,8 @@ import json
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request as HTTPRequest
+from fastapi import FastAPI, HTTPException
+from fastapi import Request as HTTPRequest
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -61,8 +62,9 @@ def build_backend(cfg: Config):
         from .backends.mock import MockBackend
 
         return MockBackend(
-            n_ctx=cfg.n_ctx_per_seq * cfg.max_seqs,
+            n_ctx=cfg.n_ctx_per_seq * (cfg.max_seqs + cfg.cache_seqs),
             max_seqs=cfg.max_seqs,
+            cache_seqs=cfg.cache_seqs if cfg.enable_prefix_cache else 0,
             block_size=cfg.block_size,
             token_latency_s=cfg.mock_token_latency_s,
         )
@@ -72,6 +74,7 @@ def build_backend(cfg: Config):
         model_path=cfg.model_path,
         n_ctx_per_seq=cfg.n_ctx_per_seq,
         max_seqs=cfg.max_seqs,
+        cache_seqs=cfg.cache_seqs if cfg.enable_prefix_cache else 0,
         n_gpu_layers=cfg.n_gpu_layers,
         block_size=cfg.block_size,
         verbose=cfg.verbose_llama,
@@ -165,9 +168,9 @@ def create_app(cfg: Config | None = None) -> FastAPI:
         try:
             engine.submit(req)
         except QueueFull as e:
-            raise HTTPException(503, str(e))
+            raise HTTPException(503, str(e)) from e
         except ContextOverflow as e:
-            raise HTTPException(413, str(e))
+            raise HTTPException(413, str(e)) from e
 
         app.state.metrics.on_arrival(req)
 

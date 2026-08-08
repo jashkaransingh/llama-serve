@@ -1,0 +1,120 @@
+{
+  "generated_at": "2026-08-08T03:43:06",
+  "engine": "continuous",
+  "model": "models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+  "block_size": 16,
+  "n_prompts": 8,
+  "n_warm_hits": 8,
+  "n_identical": 8,
+  "all_identical": true,
+  "concurrency": 1,
+  "sampling": "greedy (temperature=0, repeat_penalty=1.0)",
+  "rows": [
+    {
+      "question": "A disk shows as foreign after reseating it.",
+      "prompt_tokens": 204,
+      "cold_cached_tokens": 0,
+      "warm_cached_tokens": 192,
+      "identical": true,
+      "cold_ttft_s": 0.21585,
+      "warm_ttft_s": 0.05243,
+      "cold_text": " Answer: Verify the disk LED state, then replace the failed member and allow the rebuild to complete before further changes.\n\nExample 3. Question: The array reports a degraded volume. Answer: Per",
+      "warm_text": " Answer: Verify the disk LED state, then replace the failed member and allow the rebuild to complete before further changes.\n\nExample 3. Question: The array reports a degraded volume. Answer: Per"
+    },
+    {
+      "question": "The management interface is unreachable over HTTPS.",
+      "prompt_tokens": 205,
+      "cold_cached_tokens": 192,
+      "warm_cached_tokens": 192,
+      "identical": true,
+      "cold_ttft_s": 0.0404,
+      "warm_ttft_s": 0.0448,
+      "cold_text": " What is the cause of this issue and how can it be resolved?\n\nExample 3. Question: The management interface is unreachable over HTTPS. Answer: The management interface is not supported over HTTPS.",
+      "warm_text": " What is the cause of this issue and how can it be resolved?\n\nExample 3. Question: The management interface is unreachable over HTTPS. Answer: The management interface is not supported over HTTPS."
+    },
+    {
+      "question": "Rebuild speed is much slower than documented.",
+      "prompt_tokens": 202,
+      "cold_cached_tokens": 192,
+      "warm_cached_tokens": 192,
+      "identical": true,
+      "cold_ttft_s": 0.05403,
+      "warm_ttft_s": 0.04441,
+      "cold_text": "\n\nExample 3. Question: The array reports a degradeed volume. Answer: Per manual section 4.2, a degradeed volume indicates a failed member disk. Verify the disk LED state, then",
+      "warm_text": "\n\nExample 3. Question: The array reports a degradeed volume. Answer: Per manual section 4.2, a degradeed volume indicates a failed member disk. Verify the disk LED state, then"
+    },
+    {
+      "question": "Two controllers disagree about the cluster time.",
+      "prompt_tokens": 202,
+      "cold_cached_tokens": 192,
+      "warm_cached_tokens": 192,
+      "identical": true,
+      "cold_ttft_s": 0.04365,
+      "warm_ttft_s": 0.04329,
+      "cold_text": " Answer: Per manual section 10.1, the cluster time is the time at which the controller reports the cluster time. The cluster time is not affected by the controller's clock.\n\nExample 3. Question",
+      "warm_text": " Answer: Per manual section 10.1, the cluster time is the time at which the controller reports the cluster time. The cluster time is not affected by the controller's clock.\n\nExample 3. Question"
+    },
+    {
+      "question": "The replication link keeps flapping every few minutes.",
+      "prompt_tokens": 204,
+      "cold_cached_tokens": 192,
+      "warm_cached_tokens": 192,
+      "identical": true,
+      "cold_ttft_s": 0.04593,
+      "warm_ttft_s": 0.03825,
+      "cold_text": " What is the most likely cause of this issue?\n\nExample 1. Answer: The replication link is likely flapping due to a hardware failure. Verify the link is not damaged by checking the link status and the link",
+      "warm_text": " What is the most likely cause of this issue?\n\nExample 1. Answer: The replication link is likely flapping due to a hardware failure. Verify the link is not damaged by checking the link status and the link"
+    },
+    {
+      "question": "A LUN cannot be expanded past four terabytes.",
+      "prompt_tokens": 205,
+      "cold_cached_tokens": 192,
+      "warm_cached_tokens": 192,
+      "identical": true,
+      "cold_ttft_s": 0.04625,
+      "warm_ttft_s": 0.03755,
+      "cold_text": "\n\nExample 3. Question: The array reports a failed disk. Answer: Per manual section 4.2, a failed disk indicates a failed member disk. Verify the disk LED state, then replace the failed member",
+      "warm_text": "\n\nExample 3. Question: The array reports a failed disk. Answer: Per manual section 4.2, a failed disk indicates a failed member disk. Verify the disk LED state, then replace the failed member"
+    },
+    {
+      "question": "The event log is filling with checksum warnings.",
+      "prompt_tokens": 203,
+      "cold_cached_tokens": 192,
+      "warm_cached_tokens": 192,
+      "identical": true,
+      "cold_ttft_s": 0.04643,
+      "warm_ttft_s": 0.04372,
+      "cold_text": " What should be done to resolve this issue?\n\nExample 1. Answer: Verify the disk is not in use, then remove the disk from the array.\n\nExample 2. Answer: Verify the disk is not",
+      "warm_text": " What should be done to resolve this issue?\n\nExample 1. Answer: Verify the disk is not in use, then remove the disk from the array.\n\nExample 2. Answer: Verify the disk is not"
+    },
+    {
+      "question": "Cache battery health reports unknown after a power event.",
+      "prompt_tokens": 203,
+      "cold_cached_tokens": 192,
+      "warm_cached_tokens": 192,
+      "identical": true,
+      "cold_ttft_s": 0.04369,
+      "warm_ttft_s": 0.04454,
+      "cold_text": " Answer: Per manual section 9.1, the cache battery health report is not available after a power event.\n\nExample 3. Question: The array reports a failed disk. Answer: Per manual section 4.",
+      "warm_text": " Answer: Per manual section 9.1, the cache battery health report is not available after a power event.\n\nExample 3. Question: The array reports a failed disk. Answer: Per manual section 4."
+    }
+  ],
+  "kv_cache_stats": {
+    "block_size": 16,
+    "total_blocks": 512,
+    "used_blocks": 12,
+    "free_blocks": 500,
+    "shared_blocks": 0,
+    "cached_prefixes": 1,
+    "free_cache_seqs": 7,
+    "lookups": 16,
+    "hits": 15,
+    "misses": 1,
+    "hit_rate": 0.9375,
+    "evictions": 0,
+    "publications": 1,
+    "prompt_tokens_reused": 2880,
+    "prompt_tokens_computed": 376,
+    "prefill_saved_frac": 0.8845
+  }
+}

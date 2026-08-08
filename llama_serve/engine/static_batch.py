@@ -25,7 +25,7 @@ from collections import deque
 from collections.abc import AsyncIterator
 
 from ..backends.base import TokenSlot
-from ._util import Emitter, SENTINEL, accept_token, check_stop, finish, is_stop_token
+from ._util import SENTINEL, Emitter, accept_token, check_stop, finish, is_stop_token
 from .base import ContextOverflow, Engine, QueueFull
 from .request import FinishReason, Request, Stage
 

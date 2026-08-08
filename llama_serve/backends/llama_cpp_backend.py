@@ -107,6 +107,7 @@ class LlamaCppBackend(Backend):
         model_path: str,
         n_ctx_per_seq: int = 1024,
         max_seqs: int = 8,
+        cache_seqs: int = 0,
         n_gpu_layers: int = -1,
         n_threads: int | None = None,
         block_size: int = 16,
@@ -119,6 +120,10 @@ class LlamaCppBackend(Backend):
 
         self.model_path = model_path
         self.max_seqs = max_seqs
+        # Donor slots for the prefix cache live beyond the running slots, so a
+        # cached prefix does not consume capacity that a live request needs.
+        self.cache_seqs = cache_seqs
+        self.n_seq_total = max_seqs + cache_seqs
         self.block_size = block_size
         self.n_ctx_per_seq = n_ctx_per_seq
 
@@ -132,8 +137,8 @@ class LlamaCppBackend(Backend):
         cparams = C.llama_context_default_params()
         # llama.cpp's KV cache is unified: n_ctx is the total number of cells
         # shared by all sequences, so budget it per sequence slot.
-        cparams.n_ctx = n_ctx_per_seq * max_seqs
-        cparams.n_seq_max = max_seqs
+        cparams.n_ctx = n_ctx_per_seq * self.n_seq_total
+        cparams.n_seq_max = self.n_seq_total
         # One decode call may carry a full prefill chunk for one sequence plus a
         # decode token for every other, so the batch must be at least that wide.
         cparams.n_batch = max(512, n_ctx_per_seq)
@@ -158,7 +163,7 @@ class LlamaCppBackend(Backend):
         self.n_vocab = C.llama_vocab_n_tokens(self._vocab)
         self._mem = C.llama_get_memory(self._ctx)
 
-        self._batch = C.llama_batch_init(self.n_batch, 0, max_seqs)
+        self._batch = C.llama_batch_init(self.n_batch, 0, self.n_seq_total)
         self._lock = threading.Lock()
         self._closed = False
 
@@ -256,8 +261,35 @@ class LlamaCppBackend(Backend):
             C.llama_memory_seq_rm(self._mem, seq_id, p0, p1)
 
     def seq_cp(self, src: int, dst: int, p0: int = -1, p1: int = -1) -> bool:
+        """Whole-sequence copy only.
+
+        `llama_kv_cache::seq_cp` in this build asserts
+        `is_full && "seq_cp() is only supported for full KV buffers"` and calls
+        `ggml_abort` on failure, which kills the process rather than returning
+        an error. So a partial range is refused here instead of being attempted.
+        """
+        full = p0 <= 0 and p1 < 0
+        if not full:
+            return False
         with self._lock:
-            C.llama_memory_seq_cp(self._mem, src, dst, p0, p1)
+            C.llama_memory_seq_cp(self._mem, src, dst, -1, -1)
+        return True
+
+    def seq_share_prefix(self, src: int, dst: int, n_tokens: int) -> bool:
+        """Share `src`'s first `n_tokens` cells with `dst`, zero-copy.
+
+        Built from the two range-safe primitives: copy the whole sequence (the
+        only form `seq_cp` accepts), then remove `dst` from the cells past the
+        prefix. `llama_memory_seq_cp` adds `dst` to each cell's sequence set
+        rather than duplicating the K/V data, so this shares memory rather than
+        spending it — the trim afterwards only drops `dst`'s membership.
+        """
+        if n_tokens <= 0:
+            return False
+        with self._lock:
+            C.llama_memory_seq_rm(self._mem, dst, -1, -1)
+            C.llama_memory_seq_cp(self._mem, src, dst, -1, -1)
+            C.llama_memory_seq_rm(self._mem, dst, n_tokens, -1)
         return True
 
     def close(self) -> None:

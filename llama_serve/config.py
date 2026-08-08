@@ -33,6 +33,7 @@ class Config:
     prefill_chunk: int = 256  # max prompt tokens admitted per decode step
     static_batch_wait_s: float = 0.02  # static engine: window to collect a batch
     block_size: int = 16  # paged KV block size, in tokens
+    cache_seqs: int = 8  # donor sequence slots reserved for the prefix cache
 
     # scheduling
     policy: str = "priority"  # "fcfs" | "priority"
@@ -48,7 +49,7 @@ class Config:
     port: int = 8000
 
     @classmethod
-    def from_env(cls) -> "Config":
+    def from_env(cls) -> Config:
         d = cls()
         for f in d.__dataclass_fields__:
             d.__dict__[f] = _env(f"LLAMA_SERVE_{f.upper()}", getattr(d, f))

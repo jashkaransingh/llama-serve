@@ -47,7 +47,7 @@ class SamplingParams:
     # token" load test secretly a 30-token one.
     ignore_eos: bool = False
 
-    def normalized(self) -> "SamplingParams":
+    def normalized(self) -> SamplingParams:
         """Clamp values into ranges llama.cpp accepts."""
         return SamplingParams(
             temperature=max(0.0, float(self.temperature)),
@@ -127,6 +127,21 @@ class Backend(abc.ABC):
 
     def seq_cp(self, src: int, dst: int, p0: int = -1, p1: int = -1) -> bool:
         """Copy cached KV from one sequence to another. Returns False if unsupported."""
+        return False
+
+    def seq_share_prefix(self, src: int, dst: int, n_tokens: int) -> bool:
+        """Give `dst` the first `n_tokens` positions of `src`'s KV cache.
+
+        This is the one KV operation the prefix cache needs, and it is a
+        separate method rather than a `seq_cp(src, dst, 0, n)` call because
+        backends differ in what ranges they will accept. llama.cpp 0.3.34
+        asserts `seq_cp() is only supported for full KV buffers` — a partial
+        range aborts the process — so its implementation copies the whole
+        sequence and then trims the destination. Hiding that behind a named
+        operation keeps the workaround where it belongs, in the backend.
+
+        Returns False if the backend cannot share.
+        """
         return False
 
     def close(self) -> None:  # pragma: no cover - default no-op
