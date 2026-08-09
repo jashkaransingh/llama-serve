@@ -88,8 +88,8 @@ high-priority so the scheduler may take a slot from a background generation
 
 | | preemption off | preemption on |
 |---|---|---|
-| urgent-request TTFT, mean | 15.8096 s (σ 1.3878) | **0.1120 s** (σ 0.0175) |
-| longest background request | 16.8175 s (σ 1.3890) | 15.2641 s (σ 0.0953) |
+| urgent-request TTFT, mean | 15.8096 s (σ 1.3878) | **0.112 s** (σ 0.0175) |
+| longest background request | 16.8175 s (σ 1.389) | 15.2641 s (σ 0.0953) |
 | background output length | 300/300 tokens | 300/300 tokens |
 
 141× lower TTFT for the urgent request, with no measurable slowdown for the
