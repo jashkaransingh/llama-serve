@@ -39,7 +39,8 @@ class Config:
     policy: str = "priority"  # "fcfs" | "priority"
     enable_preemption: bool = True
     enable_prefix_cache: bool = True
-    starvation_s: float = 5.0  # age at which a request is force-promoted
+    starvation_s: float = 5.0  # queue wait at which a request is force-promoted
+    max_preemptions: int = 2  # after this many, a request can no longer be preempted
 
     # mock backend knobs (benchmarking the scheduler without a model)
     mock_token_latency_s: float = 0.0

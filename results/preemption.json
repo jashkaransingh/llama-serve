@@ -1,0 +1,158 @@
+{
+  "preempt-on": {
+    "label": "preempt-on",
+    "generated_at": "2026-08-08T03:53:05",
+    "engine": "continuous",
+    "preemption_enabled": true,
+    "starvation_s": 5.0,
+    "max_preemptions": 2,
+    "max_seqs": 8,
+    "long_tokens": 300,
+    "short_tokens": 16,
+    "delay_s": 1.0,
+    "repeats": 3,
+    "urgent_ttft_s": {
+      "mean": 0.112,
+      "stdev": 0.0175,
+      "min": 0.0873,
+      "max": 0.125,
+      "n": 3
+    },
+    "long_total_max_s": {
+      "mean": 15.2641,
+      "stdev": 0.0953,
+      "min": 15.1376,
+      "max": 15.3677,
+      "n": 3
+    },
+    "wall_s": {
+      "mean": 15.266,
+      "stdev": 0.0945,
+      "min": 15.1407,
+      "max": 15.369,
+      "n": 3
+    },
+    "victim_output_tokens_min": 300,
+    "victim_output_tokens_max": 300,
+    "expected_output_tokens": 300,
+    "runs": [
+      {
+        "run": 0,
+        "in_flight_at_send": 8,
+        "urgent_ttft_s": 0.0873,
+        "urgent_total_s": 0.8948,
+        "long_total_max_s": 15.2869,
+        "long_chunks_min": 300,
+        "long_chunks_max": 300,
+        "wall_s": 15.2883,
+        "preemptions": 1,
+        "resumes": 1,
+        "resumed_tokens_recomputed": 15
+      },
+      {
+        "run": 1,
+        "in_flight_at_send": 8,
+        "urgent_ttft_s": 0.1236,
+        "urgent_total_s": 0.8241,
+        "long_total_max_s": 15.3677,
+        "long_chunks_min": 300,
+        "long_chunks_max": 300,
+        "wall_s": 15.369,
+        "preemptions": 2,
+        "resumes": 2,
+        "resumed_tokens_recomputed": 30
+      },
+      {
+        "run": 2,
+        "in_flight_at_send": 8,
+        "urgent_ttft_s": 0.125,
+        "urgent_total_s": 0.8336,
+        "long_total_max_s": 15.1376,
+        "long_chunks_min": 300,
+        "long_chunks_max": 300,
+        "wall_s": 15.1407,
+        "preemptions": 3,
+        "resumes": 3,
+        "resumed_tokens_recomputed": 45
+      }
+    ]
+  },
+  "preempt-off": {
+    "label": "preempt-off",
+    "generated_at": "2026-08-08T03:54:29",
+    "engine": "continuous",
+    "preemption_enabled": false,
+    "starvation_s": 0.0,
+    "max_preemptions": 2,
+    "max_seqs": 8,
+    "long_tokens": 300,
+    "short_tokens": 16,
+    "delay_s": 1.0,
+    "repeats": 3,
+    "urgent_ttft_s": {
+      "mean": 15.8096,
+      "stdev": 1.3878,
+      "min": 13.8516,
+      "max": 16.9055,
+      "n": 3
+    },
+    "long_total_max_s": {
+      "mean": 16.8175,
+      "stdev": 1.389,
+      "min": 14.8575,
+      "max": 17.9103,
+      "n": 3
+    },
+    "wall_s": {
+      "mean": 16.9533,
+      "stdev": 1.4093,
+      "min": 14.9636,
+      "max": 18.0474,
+      "n": 3
+    },
+    "victim_output_tokens_min": 300,
+    "victim_output_tokens_max": 300,
+    "expected_output_tokens": 300,
+    "runs": [
+      {
+        "run": 0,
+        "in_flight_at_send": 8,
+        "urgent_ttft_s": 13.8516,
+        "urgent_total_s": 13.9559,
+        "long_total_max_s": 14.8575,
+        "long_chunks_min": 300,
+        "long_chunks_max": 300,
+        "wall_s": 14.9636,
+        "preemptions": 0,
+        "resumes": 0,
+        "resumed_tokens_recomputed": 0
+      },
+      {
+        "run": 1,
+        "in_flight_at_send": 8,
+        "urgent_ttft_s": 16.6717,
+        "urgent_total_s": 16.8345,
+        "long_total_max_s": 17.6847,
+        "long_chunks_min": 300,
+        "long_chunks_max": 300,
+        "wall_s": 17.8489,
+        "preemptions": 0,
+        "resumes": 0,
+        "resumed_tokens_recomputed": 0
+      },
+      {
+        "run": 2,
+        "in_flight_at_send": 8,
+        "urgent_ttft_s": 16.9055,
+        "urgent_total_s": 17.0398,
+        "long_total_max_s": 17.9103,
+        "long_chunks_min": 300,
+        "long_chunks_max": 300,
+        "wall_s": 18.0474,
+        "preemptions": 0,
+        "resumes": 0,
+        "resumed_tokens_recomputed": 0
+      }
+    ]
+  }
+}

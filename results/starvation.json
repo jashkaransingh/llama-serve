@@ -1,0 +1,52 @@
+{
+  "protected": {
+    "label": "protected",
+    "generated_at": "2026-08-08T03:55:47",
+    "engine": "continuous",
+    "max_seqs": 4,
+    "starvation_s": 5.0,
+    "max_preemptions": 2,
+    "preemption_enabled": true,
+    "concurrent_urgent_generators": 6,
+    "urgent_requests_completed_meanwhile": 23,
+    "low_priority_completed": true,
+    "low_priority_wall_s": 6.428,
+    "low_priority_tokens": 48,
+    "expected_tokens": 48,
+    "deadline_s": 60.0,
+    "scheduler_stats": {
+      "policy": "priority",
+      "preemption_enabled": true,
+      "starvation_s": 5.0,
+      "max_preemptions": 2,
+      "preemptions": 1,
+      "promotions": 1,
+      "currently_promoted": 0
+    }
+  },
+  "unprotected": {
+    "label": "unprotected",
+    "generated_at": "2026-08-08T03:57:20",
+    "engine": "continuous",
+    "max_seqs": 4,
+    "starvation_s": 0.0,
+    "max_preemptions": 2,
+    "preemption_enabled": true,
+    "concurrent_urgent_generators": 6,
+    "urgent_requests_completed_meanwhile": 172,
+    "low_priority_completed": false,
+    "low_priority_wall_s": 60.0,
+    "low_priority_tokens": 0,
+    "expected_tokens": 48,
+    "deadline_s": 60.0,
+    "scheduler_stats": {
+      "policy": "priority",
+      "preemption_enabled": true,
+      "starvation_s": 0.0,
+      "max_preemptions": 2,
+      "preemptions": 0,
+      "promotions": 0,
+      "currently_promoted": 0
+    }
+  }
+}

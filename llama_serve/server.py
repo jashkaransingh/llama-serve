@@ -22,6 +22,8 @@ def parse_args(argv=None) -> Config:
     p.add_argument("--block-size", type=int, default=cfg.block_size)
     p.add_argument("--policy", choices=["fcfs", "priority"], default=cfg.policy)
     p.add_argument("--no-preemption", action="store_true")
+    p.add_argument("--starvation-s", type=float, default=cfg.starvation_s)
+    p.add_argument("--max-preemptions", type=int, default=cfg.max_preemptions)
     p.add_argument("--no-prefix-cache", action="store_true")
     p.add_argument("--mock-token-latency", type=float, default=cfg.mock_token_latency_s)
     p.add_argument("--host", default=cfg.host)
@@ -38,6 +40,8 @@ def parse_args(argv=None) -> Config:
     cfg.block_size = a.block_size
     cfg.policy = a.policy
     cfg.enable_preemption = not a.no_preemption
+    cfg.starvation_s = a.starvation_s
+    cfg.max_preemptions = a.max_preemptions
     cfg.enable_prefix_cache = not a.no_prefix_cache
     cfg.mock_token_latency_s = a.mock_token_latency
     cfg.host, cfg.port = a.host, a.port

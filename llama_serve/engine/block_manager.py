@@ -95,8 +95,12 @@ class BlockManager:
 
     # --- engine hooks -----------------------------------------------------
     def on_admit(self, req) -> int:
-        """Populate `req.seq_id`'s KV from the cache. Returns tokens already computed."""
-        tokens = req.prompt_tokens
+        """Populate `req.seq_id`'s KV from the cache. Returns tokens already computed.
+
+        Matches on everything the request needs back in the cache, which for a
+        request resumed after preemption is prompt + tokens already generated.
+        """
+        tokens = req.prefill_src or req.prompt_tokens
         hashes = self.block_hashes(tokens)
         if not hashes:
             with self._lock:
@@ -129,7 +133,10 @@ class BlockManager:
         with self._lock:
             self.hits += 1
             self.tokens_saved += n_tokens
-        req.metrics.cached_prompt_tokens = n_tokens
+        # Reported against the prompt, so the server-level hit rate stays a
+        # fraction: a resumed request can legitimately reuse more tokens than
+        # its prompt contains, and that surplus is counted as resume work.
+        req.metrics.cached_prompt_tokens = min(n_tokens, len(req.prompt_tokens))
         return n_tokens
 
     def on_finish(self, req) -> bool:
@@ -137,16 +144,28 @@ class BlockManager:
 
         Returns True if a new cache entry was created.
         """
+        return self._retire(req, req.prompt_tokens)
+
+    def on_preempt(self, req) -> bool:
+        """Retire a *paused* request, publishing prompt + generated tokens.
+
+        This is what makes preempt-by-recompute cheap. The request will be
+        re-admitted needing exactly these tokens back in the cache, and the
+        entry published here is the one it will match, so the resume costs a
+        cache lookup and a few uncached tail tokens rather than a full prefill.
+        """
+        return self._retire(req, req.resume_tokens)
+
+    def _retire(self, req, tokens: list[int]) -> bool:
         published = False
         try:
-            published = self._publish(req)
+            published = self._publish(req, tokens)
         finally:
             # The request's own sequence is always released, published or not.
             self.backend.seq_rm(req.seq_id, -1, -1)
         return published
 
-    def _publish(self, req) -> bool:
-        tokens = req.prompt_tokens
+    def _publish(self, req, tokens: list[int]) -> bool:
         hashes = self.block_hashes(tokens)
         if not hashes:
             return False

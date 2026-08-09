@@ -9,7 +9,7 @@ is a scheduling problem. This repo implements the scheduling problem.
 
 ## Status
 
-Milestones 0-4 work end to end against the real model. Nothing is claimed as
+Milestones 0-5 work end to end against the real model. Nothing is claimed as
 working here until a test or a benchmark in the repo says it
 is, with the command used to verify it.
 
@@ -20,7 +20,7 @@ is, with the command used to verify it.
 | 2 | Static batching | ✅ |
 | 3 | Continuous (iteration-level) batching | ✅ |
 | 4 | Paged KV-cache allocator + prefix sharing | ✅ |
-| 5 | Scheduling policy (priority + preemption) | ⬜ |
+| 5 | Scheduling policy (priority + preemption) | ✅ |
 | 6 | Observability (`/metrics`) | ⬜ |
 | 7 | Load testing harness + measured results | ⬜ |
 
@@ -42,8 +42,31 @@ eight 300-token generations (`bench/late_arrival.py`,
 | late-request TTFT, all slots busy | 8.7515 s | 9.1142 s | no better — see below |
 
 The saturated case is reported as measured: rebuilding the batch every step
-cannot create capacity that does not exist. Fixing it needs preemption
-(milestone 5).
+cannot create capacity that does not exist. Fixing it needs preemption — which
+is the next table.
+
+**Preemption** — the same saturated workload, with the late request marked
+high-priority so the scheduler may take a slot from a background generation
+(`bench/preemption.py`, 3 runs each, [`results/preemption.json`](results/preemption.json)):
+
+| | preemption off | preemption on |
+|---|---|---|
+| urgent-request TTFT, mean | 15.8096 s (σ 1.3878) | **0.1120 s** (σ 0.0175) |
+| longest background request | 16.8175 s (σ 1.3890) | 15.2641 s (σ 0.0953) |
+| background output length | 300/300 tokens | 300/300 tokens |
+
+141× lower TTFT for the urgent request, with no measurable slowdown for the
+background ones and no truncated output. Preemption is pause-and-resume: the
+victim keeps its emitted tokens and continues from where it stopped.
+
+**Starvation protection** — 4 slots, 6 generators keeping the queue permanently
+full of priority-0 work, one priority-9 request
+(`bench/starvation.py`, [`results/starvation.json`](results/starvation.json)):
+
+| | low-priority request | urgent requests served meanwhile |
+|---|---|---|
+| protection on (`starvation_s=5`) | **completed in 6.428 s** | 23 |
+| protection off (`starvation_s=0`) | **still waiting at 60 s** | 172 |
 
 **Paged KV cache with prefix sharing** — 4-request waves over a shared
 ~250-token preamble, same server run with the cache on and off
@@ -86,7 +109,7 @@ python scripts/smoke_test.py --concurrent 4                   # verify it
 ```
 
 ```bash
-pytest          # 44 tests, no model required (deterministic mock backend)
+pytest          # 61 tests, no model required (deterministic mock backend)
 ruff check .    # lint
 ```
 

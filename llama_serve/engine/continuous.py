@@ -42,6 +42,7 @@ from ..backends.base import TokenSlot
 from ._util import SENTINEL, Emitter, accept_token, check_stop, finish, is_stop_token
 from .base import ContextOverflow, Engine, QueueFull
 from .request import FinishReason, Request, Stage
+from .scheduler import Scheduler, SchedulerConfig
 
 
 class ContinuousBatchEngine(Engine):
@@ -75,6 +76,18 @@ class ContinuousBatchEngine(Engine):
         self.decode_widths: deque[int] = deque(maxlen=4000)
         self.step_times: deque[float] = deque(maxlen=4000)
         self.admissions_mid_flight = 0
+        self.resumes = 0
+        self.resumed_tokens = 0
+
+        # Milestone 5: priority, preemption and starvation protection.
+        self.scheduler = Scheduler(
+            SchedulerConfig(
+                policy=config.policy,
+                enable_preemption=config.enable_preemption,
+                starvation_s=config.starvation_s,
+                max_preemptions=getattr(config, "max_preemptions", 2),
+            )
+        )
 
         # Milestone 4: paged KV allocator + prefix cache. Donor sequence ids
         # live beyond the running slots (max_seqs .. max_seqs+cache_seqs-1) so a
@@ -148,6 +161,12 @@ class ContinuousBatchEngine(Engine):
         slots: list[TokenSlot] = []
         sample_targets: list[tuple[Request, int]] = []
 
+        # --- 0. take a slot from someone, if the queue needs one badly enough ---
+        # Done before the batch is built, which is what makes a preemption land
+        # exactly on a token boundary: the victim's last token is fully sampled
+        # and streamed, and it simply does not appear in this step's batch.
+        self._maybe_preempt()
+
         # --- 1. decode slots for every running sequence ---
         with self._cv:
             running = [r for r in self._active if r.stage is Stage.DECODE]
@@ -194,7 +213,7 @@ class ContinuousBatchEngine(Engine):
                 if req is None:
                     break
 
-            toks = req.prompt_tokens
+            toks = req.prefill_src
             take = min(budget, self.config.prefill_chunk, len(toks) - req.n_computed)
             if take <= 0:  # nothing left to prefill; shouldn't happen, but don't spin
                 req.stage = Stage.DECODE
@@ -227,17 +246,33 @@ class ContinuousBatchEngine(Engine):
         if req is None:
             return None
         self._waiting.remove(req)
+        resuming = bool(req.output_tokens)
         req.seq_id = self._free_slots.pop(0)
         req.stage = Stage.PREFILL
-        req.metrics.first_scheduled_t = time.perf_counter()
+        if req.metrics.first_scheduled_t is None:
+            # Only the *first* admission counts as leaving the queue; a resumed
+            # request must not have its queue time rewritten.
+            req.metrics.first_scheduled_t = time.perf_counter()
         self.backend.seq_rm(req.seq_id, -1, -1)
 
+        # A resumed request has to get back everything it had: prompt plus the
+        # tokens it already generated and streamed.
+        req.prefill_src = req.resume_tokens
         req.n_computed = 0
         if self.block_manager is not None:
             # Milestone 4: reuse any cached prefix instead of recomputing it.
+            # For a resumed request this is usually most of the work, because
+            # preemption published prompt+generated on the way out.
             req.n_computed = self.block_manager.on_admit(req)
 
-        self._samplers[req.rid] = self.backend.make_sampler(req.params)
+        sampler = self.backend.make_sampler(req.params)
+        if resuming:
+            # Restore the repetition-penalty history the old sampler held.
+            for tok in req.output_tokens:
+                sampler.accept(tok)
+            self.resumes += 1
+            self.resumed_tokens += len(req.prefill_src) - req.n_computed
+        self._samplers[req.rid] = sampler
         self._eog[req.rid] = is_stop_token(self.backend, req)
         self._active.append(req)
         if self._active and len(self._active) > 1:
@@ -245,12 +280,52 @@ class ContinuousBatchEngine(Engine):
         return req
 
     def _pick_waiting_locked(self) -> Request | None:
-        """Selection policy. Milestone 5 replaces this with a real scheduler."""
-        if not self._waiting:
-            return None
-        if self.config.policy == "priority":
-            return min(self._waiting, key=lambda r: (r.priority, r.metrics.arrival_t))
-        return self._waiting[0]
+        return self.scheduler.pick(list(self._waiting), time.perf_counter())
+
+    # --- preemption -------------------------------------------------------
+    def _maybe_preempt(self) -> None:
+        """Free a slot for a waiting request by pausing a lower-priority one."""
+        with self._cv:
+            if self._free_slots or not self._waiting:
+                return
+            now = time.perf_counter()
+            candidate = self.scheduler.pick(list(self._waiting), now)
+            if candidate is None:
+                return
+            victim = self.scheduler.choose_victim(self._active, candidate, now)
+            if victim is None:
+                return
+            self._preempt_locked(victim)
+
+    def _preempt_locked(self, req: Request) -> None:
+        """Pause `req`: release its slot, keep its tokens, put it back in the queue.
+
+        Nothing the client has already received is discarded or repeated. The
+        request resumes by re-prefilling prompt + generated tokens, which the
+        prefix cache mostly serves from the entry published here.
+        """
+        self._active.remove(req)
+        req.stage = Stage.PREEMPTED
+        seq_id = req.seq_id
+        if self.block_manager is not None:
+            self.block_manager.on_preempt(req)
+        else:
+            self.backend.seq_rm(seq_id, -1, -1)
+        self._free_slots.append(seq_id)
+
+        req.seq_id = None
+        req.n_computed = 0
+        req.prefill_src = []
+        req.metrics.preemptions += 1
+        req.metrics.last_queued_t = time.perf_counter()  # restart its wait clock
+        self.scheduler.note_preemption()
+
+        s = self._samplers.pop(req.rid, None)
+        if s is not None:
+            s.close()
+        self._pending_token.pop(req.rid, None)
+        self._eog.pop(req.rid, None)
+        self._waiting.append(req)
 
     def _advance(self, req: Request, logits_index: int) -> None:
         """Sample one token for `req` and decide whether it is finished."""
@@ -294,6 +369,7 @@ class ContinuousBatchEngine(Engine):
             s.close()
         self._eog.pop(req.rid, None)
         self._pending_token.pop(req.rid, None)
+        self.scheduler.forget(req)
         if reason in (FinishReason.ERROR, FinishReason.ABORT):
             self.failed += 1
         else:
@@ -341,7 +417,10 @@ class ContinuousBatchEngine(Engine):
             "avg_decode_width": round(sum(dw) / len(dw), 3) if dw else 0,
             "avg_slot_utilization": round(sum(dw) / (len(dw) * self.max_seqs), 4) if dw else 0,
             "avg_step_ms": round(1000 * sum(st) / len(st), 3) if st else 0,
+            "resumes": self.resumes,
+            "resumed_tokens_recomputed": self.resumed_tokens,
         }
+        out["scheduler"] = self.scheduler.stats()
         if self.block_manager is not None:
             out["kv_cache"] = self.block_manager.stats()
         return out

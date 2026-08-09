@@ -35,6 +35,11 @@ class RequestMetrics:
     """Per-request timing. Every field is measured, never estimated."""
 
     arrival_t: float = field(default_factory=time.perf_counter)
+    # When this request last *started waiting*: set at arrival and reset every
+    # time it is preempted. Starvation is measured against this rather than
+    # against arrival, so a request that has just been preempted is not
+    # instantly re-selected as the most starved one — which would livelock.
+    last_queued_t: float = field(default_factory=time.perf_counter)
     first_scheduled_t: float | None = None
     first_token_t: float | None = None
     finished_t: float | None = None
@@ -115,6 +120,11 @@ class Request:
     seq_id: int | None = None
     n_computed: int = 0  # prompt+output tokens already in the KV cache
     block_ids: list[int] = field(default_factory=list)
+    # Tokens that must be in the KV cache before this request can decode. For a
+    # fresh request that is just the prompt; for one resumed after preemption it
+    # is the prompt plus everything already generated, which is what makes
+    # resume exact rather than approximate.
+    prefill_src: list[int] = field(default_factory=list)
 
     # Streaming plumbing.
     queue: asyncio.Queue | None = field(default=None, repr=False)
@@ -134,7 +144,12 @@ class Request:
 
     @property
     def needs_prefill(self) -> bool:
-        return self.n_computed < len(self.prompt_tokens)
+        return self.n_computed < len(self.prefill_src or self.prompt_tokens)
+
+    @property
+    def resume_tokens(self) -> list[int]:
+        """Everything that has to be back in the cache to continue this request."""
+        return self.prompt_tokens + self.output_tokens
 
     def snapshot(self) -> dict:
         return {
