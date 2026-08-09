@@ -9,7 +9,7 @@ is a scheduling problem. This repo implements the scheduling problem.
 
 ## Status
 
-Milestones 0-6 work end to end against the real model. Nothing is claimed as
+All eight milestones work end to end against the real model. Nothing is claimed as
 working here until a test or a benchmark in the repo says it
 is, with the command used to verify it.
 
@@ -22,7 +22,7 @@ is, with the command used to verify it.
 | 4 | Paged KV-cache allocator + prefix sharing | ✅ |
 | 5 | Scheduling policy (priority + preemption) | ✅ |
 | 6 | Observability (`/metrics`) | ✅ |
-| 7 | Load testing harness + measured results | ⬜ |
+| 7 | Load testing harness + measured results | ✅ |
 
 **No performance number appears in this README unless it was produced by a script
 in this repo and its raw output is committed under `results/`.**
@@ -31,6 +31,43 @@ in this repo and its raw output is committed under `results/`.**
 
 Every number below names the script that produced it and the file its raw output
 lives in. All were measured on the environment described in the next section.
+
+**Load sweep against the milestone-1 baseline** — open-loop Poisson arrivals,
+32 output tokens, 3 runs of 20 s per level, 1150 completed requests per engine.
+Baseline is the blocking server from milestone 1 (`--engine simple --max-seqs 1`)
+on the identical workload and seeds (`bench/load.py`,
+[`results/load_sweep.json`](results/load_sweep.json), raw per-request CSVs under
+[`results/load_raw/`](results/load_raw), rendered table
+[`results/load_comparison.md`](results/load_comparison.md)):
+
+| offered QPS | p50 TTFT base | p50 TTFT now | p99 TTFT base | p99 TTFT now |
+|---|---|---|---|---|
+| 2 | 0.1768 s | **0.0536 s** | 1.0176 s | **0.1597 s** |
+| 3 | 0.5775 s | **0.0597 s** | 2.3476 s | **0.1414 s** |
+| 4 *(base saturated)* | 1.7260 s | **0.0678 s** | 5.5115 s | **0.9048 s** |
+| 5 *(base saturated)* | 3.9203 s | **0.0849 s** | 10.8430 s | **1.1017 s** |
+| 6 *(both saturated)* | 6.8362 s | 2.2966 s | 17.8081 s | 10.0957 s |
+
+Highest load each engine kept up with:
+
+| | achieved QPS | p50 TTFT | p99 TTFT |
+|---|---|---|---|
+| milestone-1 blocking server | 2.49 | 0.5775 s | 2.3476 s |
+| current server | **4.43** | **0.0849 s** | **1.1017 s** |
+
+**1.78× the sustained throughput, at 85 % lower p50 TTFT and 53 % lower p99.**
+
+Read those percentages carefully: most of the gap at 4–5 QPS is *the baseline
+degrading*, not the current server improving — its p50 goes 0.58 s → 3.92 s
+while the current server moves 0.06 s → 0.08 s. A serving stack's value shows up
+as the load at which it stops working. The comparison also bundles every
+milestone at once; attribution to individual mechanisms is in the experiments
+below.
+
+This machine sustains roughly **5 QPS at 32 output tokens** and **12 QPS at 8**
+(`bench/load.py --probe`, [`results/load_probe.json`](results/load_probe.json)).
+That is what a 1.1B model on one M1 Pro does; the sweep range was chosen to
+bracket it rather than to hit a round number.
 
 **Continuous vs static batching** — a short request arriving 1 s into a batch of
 eight 300-token generations (`bench/late_arrival.py`,
@@ -120,7 +157,8 @@ llama_serve_requests_finished_total 120
 
 ## Environment this was built on
 
-- Apple M1 Pro, 16 GB unified memory, macOS 15 (Darwin 25.5.0, arm64)
+- Apple M1 Pro, 16 GB unified memory, macOS 26.5.1 (Darwin 25.5.0, arm64) —
+  every benchmark JSON records the host it ran on, so this stays checkable
 - Python 3.11, `llama-cpp-python` 0.3.34 built from source with
   `-DGGML_METAL=on`; Metal backend active (`Apple M1 Pro`, `MTLGPUFamilyApple7`)
 - Model: TinyLlama-1.1B-Chat v1.0, Q4_K_M GGUF (638 MB) — small enough that
@@ -136,8 +174,31 @@ python scripts/smoke_test.py --concurrent 4                   # verify it
 ```
 
 ```bash
-pytest          # 76 tests, no model required (deterministic mock backend)
+pytest          # 87 tests, no model required (deterministic mock backend)
 ruff check .    # lint
+```
+
+## Reproducing the measurements
+
+Every table above comes from one of these. Each writes its raw output under
+`results/`, and each takes a `--label`, so a re-run lands next to the committed
+one instead of overwriting it.
+
+```bash
+# capacity of this machine, then the sweep and its baseline
+python bench/load.py --probe --max-tokens 32
+python -m llama_serve.server --engine continuous --max-seqs 8
+python bench/load.py --label continuous --qps 1,2,3,4,5,6 --runs 3 --duration 20
+python -m llama_serve.server --engine simple --max-seqs 1
+python bench/load.py --label simple-baseline --qps 1,2,3,4,5,6 --runs 3 --duration 20
+python bench/load.py --compare simple-baseline,continuous
+
+# the per-mechanism experiments
+python bench/late_arrival.py --label continuous-headroom --mode headroom
+python bench/prefix_cache.py --label cache-on --waves 6
+python bench/prefix_cache_equivalence.py
+python bench/preemption.py --label preempt-on
+python bench/starvation.py --label protected
 ```
 
 ```bash
