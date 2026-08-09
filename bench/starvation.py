@@ -117,7 +117,7 @@ async def main() -> int:
         for t in load:
             t.cancel()
         await asyncio.gather(*load, return_exceptions=True)
-        stats = (await c.get("/metrics")).json().get("engine", {})
+        stats = (await c.get("/metrics.json")).json().get("engine", {})
 
     out = {
         "label": args.label,

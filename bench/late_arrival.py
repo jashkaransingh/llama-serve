@@ -100,14 +100,14 @@ async def main() -> int:
         await asyncio.sleep(args.delay)
 
         # Confirm the long requests really are mid-flight before measuring.
-        m = (await c.get("/metrics")).json()
+        m = (await c.get("/metrics.json")).json()
         in_flight = m["requests"]["in_flight"]
         print(f"t={time.perf_counter() - t_start:.2f}s: {in_flight} in flight; sending late request")
 
         late = await _stream_ttft(c, short_payload)
         long_results = await asyncio.gather(*longs)
         wall = time.perf_counter() - t_start
-        metrics = (await c.get("/metrics")).json()
+        metrics = (await c.get("/metrics.json")).json()
 
     long_ttfts = [r["ttft_s"] for r in long_results if r["ttft_s"] is not None]
     out = {

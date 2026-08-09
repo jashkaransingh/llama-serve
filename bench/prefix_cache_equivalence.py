@@ -122,7 +122,7 @@ async def main() -> int:
                 f"  [{flag}] {q[:44]:<44} warm reused {warm['cached']}/{cold['prompt_tokens']} tokens"
             )
 
-        metrics = (await c.get("/metrics")).json()
+        metrics = (await c.get("/metrics.json")).json()
 
     hit = [r for r in rows if r["warm_cached_tokens"] > 0]
     identical = [r for r in rows if r["identical"]]

@@ -109,13 +109,13 @@ async def main() -> int:
             longs = [asyncio.create_task(_run(c, long_payload)) for _ in range(max_seqs)]
             await asyncio.sleep(args.delay)
 
-            m = (await c.get("/metrics")).json()
+            m = (await c.get("/metrics.json")).json()
             in_flight = m["requests"]["in_flight"]
 
             urgent = await _run(c, urgent_payload)
             long_results = await asyncio.gather(*longs)
             wall = time.perf_counter() - t_start
-            stats = (await c.get("/metrics")).json().get("engine", {})
+            stats = (await c.get("/metrics.json")).json().get("engine", {})
 
             short_outputs = [r["chunks"] for r in long_results]
             runs.append(

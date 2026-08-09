@@ -9,7 +9,7 @@ is a scheduling problem. This repo implements the scheduling problem.
 
 ## Status
 
-Milestones 0-5 work end to end against the real model. Nothing is claimed as
+Milestones 0-6 work end to end against the real model. Nothing is claimed as
 working here until a test or a benchmark in the repo says it
 is, with the command used to verify it.
 
@@ -21,7 +21,7 @@ is, with the command used to verify it.
 | 3 | Continuous (iteration-level) batching | ✅ |
 | 4 | Paged KV-cache allocator + prefix sharing | ✅ |
 | 5 | Scheduling policy (priority + preemption) | ✅ |
-| 6 | Observability (`/metrics`) | ⬜ |
+| 6 | Observability (`/metrics`) | ✅ |
 | 7 | Load testing harness + measured results | ⬜ |
 
 **No performance number appears in this README unless it was produced by a script
@@ -91,6 +91,33 @@ produced identical output; the same run at concurrency 1 did not. So output
 equality is asserted exhaustively against the deterministic mock backend, and on
 the real model only in the controlled single-request comparison above.
 
+## Observability
+
+| endpoint | what it is |
+|---|---|
+| `GET /metrics` | Prometheus text exposition — counters, gauges, and summaries with exact quantiles |
+| `GET /metrics.json` | the same numbers as a JSON snapshot |
+| `GET /metrics/requests` | raw per-request rows for real completed requests |
+| `GET /dashboard` | dependency-free live view, for watching the scheduler during a benchmark |
+
+Latency is exposed as summaries rather than histograms: the registry keeps raw
+samples, so the quantiles are exact rather than bucket-rounded. **A quantile
+below its sample floor is omitted, not invented** — p90 needs 10 samples and p99
+needs 100, and below that the series is simply absent.
+
+A real scrape is committed at [`results/metrics_sample.txt`](results/metrics_sample.txt);
+a test checks the exposition parses with `prometheus_client`'s own parser.
+
+Four lines from that scrape, verbatim (120 completed requests, so p99 is
+justified and present):
+
+```
+llama_serve_time_to_first_token_seconds{quantile="0.5"} 0.20892
+llama_serve_time_to_first_token_seconds{quantile="0.99"} 0.3293
+llama_serve_kv_cache_hits_total 121
+llama_serve_requests_finished_total 120
+```
+
 ## Environment this was built on
 
 - Apple M1 Pro, 16 GB unified memory, macOS 15 (Darwin 25.5.0, arm64)
@@ -109,7 +136,7 @@ python scripts/smoke_test.py --concurrent 4                   # verify it
 ```
 
 ```bash
-pytest          # 61 tests, no model required (deterministic mock backend)
+pytest          # 76 tests, no model required (deterministic mock backend)
 ruff check .    # lint
 ```
 

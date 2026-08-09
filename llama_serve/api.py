@@ -15,7 +15,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi import Request as HTTPRequest
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    StreamingResponse,
+)
 from pydantic import BaseModel, Field
 
 from .backends.base import SamplingParams
@@ -138,7 +143,28 @@ def create_app(cfg: Config | None = None) -> FastAPI:
 
     @app.get("/metrics")
     async def metrics():
+        """Prometheus exposition. `/metrics` is where scrapers look by default."""
+        from .prometheus import CONTENT_TYPE, render
+
+        body = render(app.state.metrics, app.state.engine, cfg)
+        return PlainTextResponse(body, media_type=CONTENT_TYPE)
+
+    @app.get("/metrics.json")
+    async def metrics_json():
+        """The same numbers, shaped for humans and for the benchmark scripts."""
         return JSONResponse(app.state.metrics.snapshot(app.state.engine))
+
+    @app.get("/metrics/requests")
+    async def metrics_requests(limit: int = 200):
+        """Raw per-request rows for real completed requests.
+
+        Prometheus deliberately has no per-request view — it aggregates. This
+        endpoint exists because "p99 TTFT was 2 s" and "*which* request took
+        2 s, and how long did it sit in the queue first" are different
+        questions, and the second one is the one that finds the bug.
+        """
+        rows = app.state.metrics.rows()
+        return JSONResponse({"n": len(rows), "rows": rows[-max(1, limit) :]})
 
     @app.post("/metrics/reset")
     async def metrics_reset():

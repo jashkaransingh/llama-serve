@@ -101,7 +101,7 @@ async def main() -> int:
             tot = sum(r["prompt_tokens"] for r in res)
             print(f"  wave {w}: {hit}/{tot} prompt tokens served from cache")
 
-        metrics = (await c.get("/metrics")).json()
+        metrics = (await c.get("/metrics.json")).json()
 
     # Wave 0 can never hit (nothing published yet); report it separately so the
     # steady-state number is not diluted by the unavoidable cold start.

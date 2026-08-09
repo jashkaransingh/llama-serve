@@ -130,7 +130,7 @@ async def main() -> int:
                 print(f"       queue: min={min(qts):.3f}s max={max(qts):.3f}s")
 
         print("\n== metrics ==")
-        r = await c.get("/metrics")
+        r = await c.get("/metrics.json")
         m = r.json()
         expected = 2 + args.concurrent  # non-stream + stream + concurrent
         check("GET /metrics -> 200", r.status_code == 200)

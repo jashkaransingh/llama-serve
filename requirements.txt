@@ -7,6 +7,8 @@ matplotlib>=3.8
 huggingface_hub>=0.23
 pytest>=8.0
 pytest-asyncio>=0.23
+ruff>=0.6                # lint: `ruff check .`
+prometheus_client>=0.20  # tests only: validates /metrics with the official parser
 
 # Real inference backend. On Apple Silicon build with Metal:
 #   CMAKE_ARGS="-DGGML_METAL=on" FORCE_CMAKE=1 pip install llama-cpp-python
