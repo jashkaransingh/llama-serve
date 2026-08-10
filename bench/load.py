@@ -246,6 +246,62 @@ async def drain(client, timeout: float = 60.0) -> None:
         await asyncio.sleep(0.5)
 
 
+def summarise(results_path: Path, out_path: Path) -> int:
+    """One row per label: the highest offered level the server kept up with.
+
+    "Kept up with" is the harness's own saturation rule — mean achieved QPS at
+    least 90% of the mean offered rate actually drawn. Above that level the
+    queue grows for the whole run, so the latency describes a backlog and the
+    throughput is a drain rate, not a capacity.
+    """
+    data = json.loads(results_path.read_text())
+    lines = [
+        "# Highest sustained load, by configuration",
+        "",
+        f"Generated from `{results_path}` by `bench/load.py --summary`.",
+        "",
+        "Sustained = the highest offered level whose mean achieved QPS stayed "
+        "within 10% of the offered rate, across all runs at that level. TTFT "
+        "percentiles are pooled over every completed request at that level.",
+        "",
+        "| configuration | model | out tok | slots | sustained QPS | p50 TTFT | p99 TTFT | offered | runs |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    rows = []
+    for label, run in data.items():
+        ok = [lv for lv in run["levels"] if not lv["saturated"]]
+        if not ok:
+            continue
+        best = max(ok, key=lambda x: x["achieved_qps"]["mean"])
+        env, harness = run["environment"], run["harness"]
+        model = Path(env["model"]).name if env.get("model") else "?"
+        rows.append((best["achieved_qps"]["mean"], label, model, harness, env, best))
+
+    for achieved, label, model, harness, env, best in sorted(rows, reverse=True):
+        p = best["ttft_pooled"]
+        lines.append(
+            f"| `{label}` | {model} | {harness['max_tokens']} | {env['max_seqs']} "
+            f"| **{achieved:.2f}** | {p['p50']} s | "
+            f"{'—' if p['p99'] is None else str(p['p99']) + ' s'} "
+            f"| {best['offered_qps']:g} | {best['runs']} |"
+        )
+
+    if rows:
+        top = max(rows)
+        lines += [
+            "",
+            f"Peak measured: **{top[0]:.2f} QPS** on `{top[1]}` "
+            f"({top[2]}, {top[3]['max_tokens']} output tokens, {top[4]['max_seqs']} sequence slots, "
+            f"{top[4]['platform']}).",
+        ]
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
+    print(f"\nwrote {out_path}")
+    return 0
+
+
 def compare(labels: str, results_path: Path, out_path: Path) -> int:
     """Render the comparison table from data already on disk.
 
@@ -340,6 +396,12 @@ async def main() -> int:
         "comparison table and exits without running anything",
     )
     ap.add_argument("--compare-out", default="results/load_comparison.md")
+    ap.add_argument(
+        "--summary",
+        action="store_true",
+        help="render every label's highest sustained level from --out, then exit",
+    )
+    ap.add_argument("--summary-out", default="results/load_summary.md")
     ap.add_argument("--out", default="results/load_sweep.json")
     ap.add_argument("--csv-dir", default="results/load_raw")
     args = ap.parse_args()
@@ -348,6 +410,8 @@ async def main() -> int:
 
     if args.compare:
         return compare(args.compare, Path(args.out), Path(args.compare_out))
+    if args.summary:
+        return summarise(Path(args.out), Path(args.summary_out))
 
     async with httpx.AsyncClient(base_url=args.url, timeout=args.drain_timeout) as c:
         health = (await c.get("/health")).json()

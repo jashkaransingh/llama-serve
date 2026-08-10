@@ -268,8 +268,7 @@ class ContinuousBatchEngine(Engine):
         sampler = self.backend.make_sampler(req.params)
         if resuming:
             # Restore the repetition-penalty history the old sampler held.
-            for tok in req.output_tokens:
-                sampler.accept(tok)
+            sampler.restore_history(req.output_tokens)
             self.resumes += 1
             self.resumed_tokens += len(req.prefill_src) - req.n_computed
         self._samplers[req.rid] = sampler
@@ -394,6 +393,21 @@ class ContinuousBatchEngine(Engine):
                     self._emitter.close(req)
                 else:
                     self._retire(req, FinishReason.ABORT)
+
+    def reset_stats(self) -> None:
+        """Zero the per-window counters. Live requests keep their own metrics."""
+        with self._cv:
+            self.completed = 0
+            self.failed = 0
+            self.steps = 0
+            self.decode_slots_total = 0
+            self.prefill_slots_total = 0
+            self.batch_widths.clear()
+            self.decode_widths.clear()
+            self.step_times.clear()
+            self.admissions_mid_flight = 0
+            self.resumes = 0
+            self.resumed_tokens = 0
 
     # --- introspection ----------------------------------------------------
     def stats(self) -> dict:

@@ -10,8 +10,8 @@ is a scheduling problem. This repo implements the scheduling problem.
 ## Status
 
 All eight milestones work end to end against the real model. Nothing is claimed as
-working here until a test or a benchmark in the repo says it
-is, with the command used to verify it.
+working here until a test or a benchmark says it is, and every claim below names
+the command used to verify it.
 
 | # | Milestone | Status |
 |---|-----------|--------|
@@ -23,6 +23,7 @@ is, with the command used to verify it.
 | 5 | Scheduling policy (priority + preemption) | ✅ |
 | 6 | Observability (`/metrics`) | ✅ |
 | 7 | Load testing harness + measured results | ✅ |
+| 8 | Throughput tuning against the measured ceiling | ✅ |
 
 **No performance number appears in this README unless it was produced by a script
 in this repo and its raw output is committed under `results/`.**
@@ -32,7 +33,64 @@ in this repo and its raw output is committed under `results/`.**
 Every number below names the script that produced it and the file its raw output
 lives in. All were measured on the environment described in the next section.
 
-**Load sweep against the milestone-1 baseline** — open-loop Poisson arrivals,
+**Peak sustained throughput: 27.95 QPS.** Exact configuration:
+Qwen2.5-0.5B-Instruct Q4_K_M (491 MB), **16 output tokens**, ~62-token prompts
+over a shared preamble, `--engine continuous --max-seqs 64 --n-ctx-per-seq 256`,
+greedy sampling, Apple M1 Pro / 16 GB. 3 runs per level, open-loop Poisson
+arrivals (`bench/load.py --summary`,
+[`results/load_summary.md`](results/load_summary.md)):
+
+| configuration | model | out tok | slots | sustained QPS | p50 TTFT | p99 TTFT |
+|---|---|---|---|---|---|---|
+| `qwen2.5-0.5b-q4km-16tok-64seq-fastsampler` | Qwen2.5-0.5B Q4_K_M | 16 | 64 | **27.95** | 0.5425 s | 1.4366 s |
+| `qwen2.5-0.5b-q4km-16tok-64seq` | Qwen2.5-0.5B Q4_K_M | 16 | 64 | 25.81 | 0.2293 s | 1.0773 s |
+| `tinyllama-1.1b-q4km-16tok-64seq` | TinyLlama-1.1B Q4_K_M | 16 | 64 | 14.95 | 0.2000 s | 1.0511 s |
+| `qwen2.5-0.5b-q4km-32tok-64seq` | Qwen2.5-0.5B Q4_K_M | 32 | 64 | 14.53 | 0.1250 s | 0.8817 s |
+| `tinyllama-1.1b-q4km-32tok-64seq` | TinyLlama-1.1B Q4_K_M | 32 | 64 | 10.39 | 0.1949 s | 1.5062 s |
+| `continuous` (milestone 7) | TinyLlama-1.1B Q4_K_M | 32 | 8 | 4.43 | 0.0849 s | 1.1017 s |
+| `simple-baseline` (milestone 1) | TinyLlama-1.1B Q4_K_M | 32 | 1 | 2.49 | 0.5775 s | 2.3476 s |
+
+Every row is a separate labelled configuration, all committed. Nothing was
+replaced: the milestone-7 rows are the same measurements as before.
+
+On the **identical** 32-token workload the milestone-7 baseline used, raising
+the sequence-slot count took sustained throughput from **4.43 → 10.39 QPS
+(2.34×)**. The rest of the gap to 27.95 is a smaller model and shorter
+completions, both labelled as such.
+
+At 27 QPS offered, the same configuration held **p99 TTFT 0.652 s**, versus
+1.437 s at the 30 QPS level. 27.95 is the most load it kept up with; ~26 QPS is
+the most it kept up with *comfortably*.
+
+### What limits it
+
+Measured with `bench/step_profile.py`
+([`results/step_profile.json`](results/step_profile.json)), decode-only,
+TinyLlama-1.1B:
+
+| batch width | 1 | 8 | 16 | 32 | 64 |
+|---|---|---|---|---|---|
+| ms/token | 6.6634 | 3.5115 | 2.1071 | 1.1623 | 1.0368 |
+
+One token from a 638 MB model costs 6.6634 ms, roughly the time to stream those
+weights through memory once. Decode is **memory-bandwidth-bound at small batch
+widths**, which is why wider batching is the dominant lever, and **compute-bound
+past width ~32**, where per-token cost stops improving. This is one M1 Pro with a
+shared memory bus and no tensor cores; every step must read the whole model.
+Getting materially past ~28 QPS here needs a smaller model, shorter outputs, or
+speculative decoding, not more scheduler work.
+
+On Qwen2.5, `llama_sampler_sample` cost 12.4527 ms at batch width 32 against a
+23.6513 ms decode, **34% of the step**, because it materialises a candidate array
+over all 151,936 vocabulary entries to pick one argmax. A numpy fast path for
+`temperature == 0` made sampling 5.16× faster, verified token-for-token against
+llama.cpp's own sampler on both models (320/320 and 248/248 identical,
+[`results/sampler_equivalence.json`](results/sampler_equivalence.json)). Getting
+that verification to pass surfaced a real bug: `llama_sampler_sample` already
+accepts its own token, so the engine's follow-up `accept()` was entering every
+token into the repetition-penalty history twice, halving the effective window.
+
+**Load sweep against the milestone-1 baseline.** Open-loop Poisson arrivals,
 32 output tokens, 3 runs of 20 s per level, 1150 completed requests per engine.
 Baseline is the blocking server from milestone 1 (`--engine simple --max-seqs 1`)
 on the identical workload and seeds (`bench/load.py`,
@@ -57,32 +115,31 @@ Highest load each engine kept up with:
 
 **1.78× the sustained throughput, at 85 % lower p50 TTFT and 53 % lower p99.**
 
-Read those percentages carefully: most of the gap at 4–5 QPS is *the baseline
-degrading*, not the current server improving — its p50 goes 0.58 s → 3.92 s
-while the current server moves 0.06 s → 0.08 s. A serving stack's value shows up
-as the load at which it stops working. The comparison also bundles every
-milestone at once; attribution to individual mechanisms is in the experiments
-below.
+Most of the gap at 4–5 QPS is *the baseline degrading*, not the current server
+improving: its p50 goes 0.58 s → 3.92 s while the current server moves
+0.06 s → 0.08 s. A serving stack's value shows up as the load at which it stops
+working. The comparison also bundles every milestone at once; attribution to
+individual mechanisms is in the experiments below.
 
 This machine sustains roughly **5 QPS at 32 output tokens** and **12 QPS at 8**
 (`bench/load.py --probe`, [`results/load_probe.json`](results/load_probe.json)).
 That is what a 1.1B model on one M1 Pro does; the sweep range was chosen to
 bracket it rather than to hit a round number.
 
-**Continuous vs static batching** — a short request arriving 1 s into a batch of
+**Continuous vs static batching.** A short request arriving 1 s into a batch of
 eight 300-token generations (`bench/late_arrival.py`,
 [`results/late_arrival.json`](results/late_arrival.json)):
 
 | | static | continuous | |
 |---|---|---|---|
 | late-request TTFT, one slot free | 9.1631 s | **0.0683 s** | 134× faster |
-| late-request TTFT, all slots busy | 8.7515 s | 9.1142 s | no better — see below |
+| late-request TTFT, all slots busy | 8.7515 s | 9.1142 s | no better, see below |
 
-The saturated case is reported as measured: rebuilding the batch every step
-cannot create capacity that does not exist. Fixing it needs preemption — which
-is the next table.
+Rebuilding the batch every step cannot create capacity that does not exist, so
+the saturated case is no better. Fixing it needs preemption, which is the next
+table.
 
-**Preemption** — the same saturated workload, with the late request marked
+**Preemption.** The same saturated workload, with the late request marked
 high-priority so the scheduler may take a slot from a background generation
 (`bench/preemption.py`, 3 runs each, [`results/preemption.json`](results/preemption.json)):
 
@@ -96,7 +153,7 @@ high-priority so the scheduler may take a slot from a background generation
 background ones and no truncated output. Preemption is pause-and-resume: the
 victim keeps its emitted tokens and continues from where it stopped.
 
-**Starvation protection** — 4 slots, 6 generators keeping the queue permanently
+**Starvation protection.** 4 slots, 6 generators keeping the queue permanently
 full of priority-0 work, one priority-9 request
 (`bench/starvation.py`, [`results/starvation.json`](results/starvation.json)):
 
@@ -105,7 +162,7 @@ full of priority-0 work, one priority-9 request
 | protection on (`starvation_s=5`) | **completed in 6.428 s** | 23 |
 | protection off (`starvation_s=0`) | **still waiting at 60 s** | 172 |
 
-**Paged KV cache with prefix sharing** — 4-request waves over a shared
+**Paged KV cache with prefix sharing.** 4-request waves over a shared
 ~250-token preamble, same server run with the cache on and off
 (`bench/prefix_cache.py`, [`results/prefix_cache.json`](results/prefix_cache.json)):
 
@@ -122,8 +179,8 @@ produced identical text for **8 of 8 prompts**, with 8 of 8 genuinely hitting
 the cache (`bench/prefix_cache_equivalence.py`,
 [`results/prefix_cache_equivalence.json`](results/prefix_cache_equivalence.json)).
 
-A caveat worth stating, because it shaped the methodology: llama.cpp on Metal is
-not bit-identical across batch shapes. Two cache-off runs at concurrency 4
+One caveat, which shaped the methodology: llama.cpp on Metal is not
+bit-identical across batch shapes. Two cache-off runs at concurrency 4
 produced identical output; the same run at concurrency 1 did not. So output
 equality is asserted exhaustively against the deterministic mock backend, and on
 the real model only in the controlled single-request comparison above.
@@ -132,14 +189,14 @@ the real model only in the controlled single-request comparison above.
 
 | endpoint | what it is |
 |---|---|
-| `GET /metrics` | Prometheus text exposition — counters, gauges, and summaries with exact quantiles |
+| `GET /metrics` | Prometheus text exposition: counters, gauges, and summaries with exact quantiles |
 | `GET /metrics.json` | the same numbers as a JSON snapshot |
 | `GET /metrics/requests` | raw per-request rows for real completed requests |
 | `GET /dashboard` | dependency-free live view, for watching the scheduler during a benchmark |
 
 Latency is exposed as summaries rather than histograms: the registry keeps raw
 samples, so the quantiles are exact rather than bucket-rounded. **A quantile
-below its sample floor is omitted, not invented** — p90 needs 10 samples and p99
+below its sample floor is omitted, not invented**: p90 needs 10 samples and p99
 needs 100, and below that the series is simply absent.
 
 A real scrape is committed at [`results/metrics_sample.txt`](results/metrics_sample.txt);
@@ -157,12 +214,13 @@ llama_serve_requests_finished_total 120
 
 ## Environment this was built on
 
-- Apple M1 Pro, 16 GB unified memory, macOS 26.5.1 (Darwin 25.5.0, arm64) —
-  every benchmark JSON records the host it ran on, so this stays checkable
+- Apple M1 Pro, 16 GB unified memory, macOS 26.5.1 (Darwin 25.5.0, arm64).
+  Every benchmark JSON records the host it ran on, so this stays checkable
 - Python 3.11, `llama-cpp-python` 0.3.34 built from source with
   `-DGGML_METAL=on`; Metal backend active (`Apple M1 Pro`, `MTLGPUFamilyApple7`)
-- Model: TinyLlama-1.1B-Chat v1.0, Q4_K_M GGUF (638 MB) — small enough that
-  scheduling effects, not raw model latency, dominate the measurements
+- Models: TinyLlama-1.1B-Chat v1.0 Q4_K_M GGUF (638 MB) for the milestone-to-
+  milestone comparisons, and Qwen2.5-0.5B-Instruct Q4_K_M GGUF (491 MB) as an
+  additional labelled configuration for the throughput ceiling
 - Server defaults used for the measurements above: `--engine continuous
   --max-seqs 8`, `n_ctx_per_seq=1024`, `block_size=16`, `cache_seqs=8`
 
@@ -174,7 +232,7 @@ python scripts/smoke_test.py --concurrent 4                   # verify it
 ```
 
 ```bash
-pytest          # 87 tests, no model required (deterministic mock backend)
+pytest          # 89 tests, no model required (deterministic mock backend)
 ruff check .    # lint
 ```
 
@@ -225,7 +283,7 @@ CMAKE_ARGS="-DGGML_METAL=on" FORCE_CMAKE=1 pip install --no-binary :all: llama-c
 
 Every layer of the serving stack is written against a narrow `Backend`
 interface (`llama_serve/backends/base.py`) shaped like llama.cpp's low-level C
-API — batched `decode(slots)` plus per-sequence KV operations — rather than a
+API (batched `decode(slots)` plus per-sequence KV operations) rather than a
 `generate(prompt) -> str` helper. That shape is what makes iteration-level
 batching expressible at all, and it lets the whole scheduler run against a
 deterministic mock backend in tests without loading a model.

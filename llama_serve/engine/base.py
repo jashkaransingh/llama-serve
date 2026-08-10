@@ -39,6 +39,16 @@ class Engine(abc.ABC):
     @abc.abstractmethod
     def stats(self) -> dict: ...
 
+    def reset_stats(self) -> None:
+        """Zero the engine's own counters, leaving live requests untouched.
+
+        `/metrics/reset` used to clear only `MetricsRegistry`, so a benchmark
+        that reset between runs still read engine counters accumulated since the
+        server started — average step time and batch width silently described a
+        different workload than the one just measured. Anything derived from
+        those numbers was wrong, quietly. Engines override this.
+        """
+
     # --- shared helpers ---------------------------------------------------
     def prepare(self, req: Request, backend) -> None:
         """Tokenize and record prompt length. Common to every engine."""

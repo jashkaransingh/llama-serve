@@ -4,5 +4,7 @@ __pycache__/
 *.pyc
 *.egg-info/
 .pytest_cache/
+.ruff_cache/
 *.log
 .DS_Store
+.claude/

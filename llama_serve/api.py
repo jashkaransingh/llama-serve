@@ -168,7 +168,14 @@ def create_app(cfg: Config | None = None) -> FastAPI:
 
     @app.post("/metrics/reset")
     async def metrics_reset():
+        """Start a fresh measurement window.
+
+        Resets the engine's counters too, not just the request registry: a
+        benchmark that reset between runs and then read `avg_step_ms` was
+        reading an average over every run since the server started.
+        """
         app.state.metrics.reset()
+        app.state.engine.reset_stats()
         return {"status": "reset"}
 
     @app.get("/dashboard", response_class=HTMLResponse)

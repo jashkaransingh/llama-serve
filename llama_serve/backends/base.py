@@ -70,7 +70,23 @@ class Sampler(abc.ABC):
 
     @abc.abstractmethod
     def accept(self, token: int) -> None:
-        """Feed a chosen token back into the sampler (for repetition penalties)."""
+        """Feed a chosen token back into the sampler (for repetition penalties).
+
+        Called immediately after `sample()` returned that token. Backends whose
+        `sample()` already folds the token into their own history must make this
+        a no-op — see `LlamaCppSampler`.
+        """
+
+    def restore_history(self, tokens: list[int]) -> None:
+        """Replay tokens this sampler did not choose itself.
+
+        Used when a preempted request resumes: its old sampler is gone, and the
+        new one has to be told what was already generated or the repetition
+        penalty starts from a blank history. Distinct from `accept` because for
+        chain-based samplers `accept` is a no-op and this is not.
+        """
+        for t in tokens:
+            self.accept(t)
 
     def close(self) -> None:  # pragma: no cover - default no-op
         pass

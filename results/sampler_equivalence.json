@@ -1,0 +1,118 @@
+{
+  "qwen2.5-0.5b-q4km": {
+    "label": "qwen2.5-0.5b-q4km",
+    "generated_at": "2026-08-10T15:28:20",
+    "model": "models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+    "repeat_penalty": 1.1,
+    "temperature": 0.0,
+    "prompts": 5,
+    "total_steps": 320,
+    "total_agree": 320,
+    "all_identical": true,
+    "rows": [
+      {
+        "prompt": "The capital of France is",
+        "steps": 64,
+        "agree": 64,
+        "disagree": 0,
+        "identical_text": true,
+        "first_divergence": null,
+        "text": " Paris. It is the largest city in Europe and one of the most important cities in the world. The population of Paris is about 2, 3 million people. It has a long history dating back to ancient times. In the Middle Ages, it was called \"Paris\" because it was the capital of France."
+      },
+      {
+        "prompt": "Explain in one sentence why the sky appears blue:",
+        "steps": 64,
+        "agree": 64,
+        "disagree": 0,
+        "identical_text": true,
+        "first_divergence": null,
+        "text": " The sky appears blue because of the scattering of sunlight by tiny particles in the atmosphere. \n\nThis sentence explains that the sky appears blue due to the scattering of sunlight, which is caused by tiny particles in the atmosphere. It does not provide a detailed explanation for why this happens, but rather states what causes it.\nThe answer"
+      },
+      {
+        "prompt": "List three causes of disk failure in a storage array:",
+        "steps": 64,
+        "agree": 64,
+        "disagree": 0,
+        "identical_text": true,
+        "first_divergence": null,
+        "text": " 1. Hardware failure, 2. Software errors, and 3. Environmental factors.\n1. Hardware failure: This is the most common cause of disk failure in a storage array. Hardware failures can occur due to various reasons such as hardware malfunctions, power supply issues, or mechanical damage.\n\n2. Software errors"
+      },
+      {
+        "prompt": "Once upon a time in a very small village,",
+        "steps": 64,
+        "agree": 64,
+        "disagree": 0,
+        "identical_text": true,
+        "first_divergence": null,
+        "text": " there lived a young man named John. He was very good at math and always loved to solve puzzles. One day, he decided to challenge his village elder, Mr. Smith, with a puzzle that would test the limits of their mathematical skills.\n\nMr. Smith asked John to find the sum of all prime numbers between "
+      },
+      {
+        "prompt": "def fibonacci(n):",
+        "steps": 64,
+        "agree": 64,
+        "disagree": 0,
+        "identical_text": true,
+        "first_divergence": null,
+        "text": " \n    if n <= 1: \n        return n \n\n    else:\n        return (fibonacci(n-1) + fibonacci(n-2)) \n\n\ndef main():\n    print(\"Enter the number of terms you want to see in the Fibonacci sequence:\")\n    num_terms = int(input())\n\n    # Initialize variables\n"
+      }
+    ]
+  },
+  "tinyllama-1.1b-q4km": {
+    "label": "tinyllama-1.1b-q4km",
+    "generated_at": "2026-08-10T15:28:36",
+    "model": "models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+    "repeat_penalty": 1.1,
+    "temperature": 0.0,
+    "prompts": 5,
+    "total_steps": 248,
+    "total_agree": 248,
+    "all_identical": true,
+    "rows": [
+      {
+        "prompt": "The capital of France is",
+        "steps": 11,
+        "agree": 11,
+        "disagree": 0,
+        "identical_text": true,
+        "first_divergence": null,
+        "text": " Paris.\nThe capital of France is Paris.</s>"
+      },
+      {
+        "prompt": "Explain in one sentence why the sky appears blue:",
+        "steps": 45,
+        "agree": 45,
+        "disagree": 0,
+        "identical_text": true,
+        "first_divergence": null,
+        "text": " The blue color of the sky is due to the presence of water droplets in the atmosphere. These droplets absorb some of the sunlight and reflect it back into space, creating a blue hue.</s>"
+      },
+      {
+        "prompt": "List three causes of disk failure in a storage array:",
+        "steps": 64,
+        "agree": 64,
+        "disagree": 0,
+        "identical_text": true,
+        "first_divergence": null,
+        "text": "\n\n1. Physical Failure: The disk drive itself may fail, resulting in data loss or corruption.\n2. Electrical Failure: The power supply or cooling system may malfunction, causing the disk drive to overheat and fail.\n3. Mechanical Failure: The disk"
+      },
+      {
+        "prompt": "Once upon a time in a very small village,",
+        "steps": 64,
+        "agree": 64,
+        "disagree": 0,
+        "identical_text": true,
+        "first_divergence": null,
+        "text": " there lived a young girl named Lily. She was born with a rare and mysterious power that made her the only one in the village who could see ghosts.\n\nOne day, while walking through the forest, Lily saw a ghostly figure. It was a man dressed in black, with long"
+      },
+      {
+        "prompt": "def fibonacci(n):",
+        "steps": 64,
+        "agree": 64,
+        "disagree": 0,
+        "identical_text": true,
+        "first_divergence": null,
+        "text": "\n    if n < 2:\n        return n\n    elif n == 1:\n        return 0\n    else:\n        return fibonaci(n-1) + fibonaci(n-2)\n```\n\nThis implementation uses a recursive function to calculate the sum of"
+      }
+    ]
+  }
+}

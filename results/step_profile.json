@@ -1,0 +1,226 @@
+{
+  "tinyllama-1.1b-q4km": {
+    "label": "tinyllama-1.1b-q4km",
+    "generated_at": "2026-08-10T15:56:36",
+    "model": "models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+    "platform": "macOS-26.5.1-arm64-arm-64bit",
+    "n_ctx": 16384,
+    "n_batch": 512,
+    "max_seqs": 64,
+    "prompt_tokens_used": 12,
+    "decode_by_width": {
+      "1": {
+        "mean_ms": 6.68,
+        "median_ms": 6.6634,
+        "min_ms": 6.4309,
+        "stdev_ms": 0.1438,
+        "n": 40,
+        "per_token_ms": 6.6634,
+        "tokens_per_s": 150.1
+      },
+      "8": {
+        "mean_ms": 28.1056,
+        "median_ms": 28.092,
+        "min_ms": 27.7247,
+        "stdev_ms": 0.2052,
+        "n": 40,
+        "per_token_ms": 3.5115,
+        "tokens_per_s": 284.8
+      },
+      "16": {
+        "mean_ms": 34.6721,
+        "median_ms": 33.7144,
+        "min_ms": 32.618,
+        "stdev_ms": 2.2941,
+        "n": 40,
+        "per_token_ms": 2.1071,
+        "tokens_per_s": 474.6
+      },
+      "32": {
+        "mean_ms": 37.714,
+        "median_ms": 37.1922,
+        "min_ms": 36.0647,
+        "stdev_ms": 1.4932,
+        "n": 40,
+        "per_token_ms": 1.1623,
+        "tokens_per_s": 860.4
+      },
+      "64": {
+        "mean_ms": 67.0582,
+        "median_ms": 66.3568,
+        "min_ms": 58.9168,
+        "stdev_ms": 4.049,
+        "n": 40,
+        "per_token_ms": 1.0368,
+        "tokens_per_s": 964.5
+      }
+    },
+    "prefill_by_chunk": {
+      "64": {
+        "mean_ms": 48.5633,
+        "median_ms": 48.65,
+        "min_ms": 47.259,
+        "stdev_ms": 0.7576,
+        "n": 13,
+        "per_token_ms": 0.7602,
+        "tokens_per_s": 1315.5
+      },
+      "256": {
+        "mean_ms": 177.8308,
+        "median_ms": 176.0554,
+        "min_ms": 170.6633,
+        "stdev_ms": 5.2416,
+        "n": 13,
+        "per_token_ms": 0.6877,
+        "tokens_per_s": 1454.1
+      }
+    },
+    "step_overhead": {
+      "8": {
+        "full_step_ms": 31.4594,
+        "decode_only_ms": 26.8946,
+        "python_overhead_ms": 4.5648,
+        "python_share": 0.1451
+      },
+      "16": {
+        "full_step_ms": 34.7662,
+        "decode_only_ms": 32.9486,
+        "python_overhead_ms": 1.8176,
+        "python_share": 0.0523
+      },
+      "32": {
+        "full_step_ms": 45.2308,
+        "decode_only_ms": 36.2565,
+        "python_overhead_ms": 8.9743,
+        "python_share": 0.1984
+      }
+    },
+    "sampler_chain_vs_fast_ms": {
+      "8": {
+        "chain": 1.1458,
+        "fast_greedy": 0.2174,
+        "speedup": 5.27
+      },
+      "32": {
+        "chain": 2.6868,
+        "fast_greedy": 0.6877,
+        "speedup": 3.91
+      }
+    },
+    "best_per_token_ms": 1.0368,
+    "width_at_best_per_token": 64,
+    "width_where_per_token_rises_50pct": 1
+  },
+  "qwen2.5-0.5b-q4km": {
+    "label": "qwen2.5-0.5b-q4km",
+    "generated_at": "2026-08-10T15:55:58",
+    "model": "models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+    "platform": "macOS-26.5.1-arm64-arm-64bit",
+    "n_ctx": 16384,
+    "n_batch": 512,
+    "max_seqs": 64,
+    "prompt_tokens_used": 10,
+    "decode_by_width": {
+      "1": {
+        "mean_ms": 6.0793,
+        "median_ms": 6.0645,
+        "min_ms": 5.6537,
+        "stdev_ms": 0.258,
+        "n": 30,
+        "per_token_ms": 6.0645,
+        "tokens_per_s": 164.9
+      },
+      "8": {
+        "mean_ms": 17.3146,
+        "median_ms": 16.6468,
+        "min_ms": 15.3829,
+        "stdev_ms": 1.6094,
+        "n": 30,
+        "per_token_ms": 2.0808,
+        "tokens_per_s": 480.6
+      },
+      "16": {
+        "mean_ms": 23.4089,
+        "median_ms": 22.3986,
+        "min_ms": 20.4853,
+        "stdev_ms": 3.0198,
+        "n": 30,
+        "per_token_ms": 1.3999,
+        "tokens_per_s": 714.3
+      },
+      "32": {
+        "mean_ms": 24.0033,
+        "median_ms": 23.6513,
+        "min_ms": 21.9154,
+        "stdev_ms": 2.1312,
+        "n": 30,
+        "per_token_ms": 0.7391,
+        "tokens_per_s": 1353.0
+      },
+      "64": {
+        "mean_ms": 36.5759,
+        "median_ms": 36.4185,
+        "min_ms": 34.5822,
+        "stdev_ms": 1.3269,
+        "n": 30,
+        "per_token_ms": 0.569,
+        "tokens_per_s": 1757.3
+      }
+    },
+    "prefill_by_chunk": {
+      "64": {
+        "mean_ms": 27.7808,
+        "median_ms": 27.121,
+        "min_ms": 24.9367,
+        "stdev_ms": 2.939,
+        "n": 10,
+        "per_token_ms": 0.4238,
+        "tokens_per_s": 2359.8
+      },
+      "256": {
+        "mean_ms": 72.777,
+        "median_ms": 72.3369,
+        "min_ms": 69.0256,
+        "stdev_ms": 2.9671,
+        "n": 10,
+        "per_token_ms": 0.2826,
+        "tokens_per_s": 3539.0
+      }
+    },
+    "step_overhead": {
+      "8": {
+        "full_step_ms": 20.3393,
+        "decode_only_ms": 12.5041,
+        "python_overhead_ms": 7.8352,
+        "python_share": 0.3852
+      },
+      "16": {
+        "full_step_ms": 25.7273,
+        "decode_only_ms": 19.4912,
+        "python_overhead_ms": 6.2361,
+        "python_share": 0.2424
+      },
+      "32": {
+        "full_step_ms": 28.5894,
+        "decode_only_ms": 19.6166,
+        "python_overhead_ms": 8.9728,
+        "python_share": 0.3139
+      }
+    },
+    "sampler_chain_vs_fast_ms": {
+      "8": {
+        "chain": 3.171,
+        "fast_greedy": 0.561,
+        "speedup": 5.65
+      },
+      "32": {
+        "chain": 12.4527,
+        "fast_greedy": 2.4145,
+        "speedup": 5.16
+      }
+    },
+    "best_per_token_ms": 0.569,
+    "width_at_best_per_token": 64,
+    "width_where_per_token_rises_50pct": 1
+  }
+}

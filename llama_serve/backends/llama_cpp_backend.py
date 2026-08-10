@@ -23,8 +23,10 @@ from __future__ import annotations
 import ctypes
 import os
 import threading
+from collections import deque
 
 import llama_cpp.llama_cpp as C
+import numpy as np
 
 from .base import Backend, Sampler, SamplingParams, TokenSlot
 
@@ -50,6 +52,66 @@ def _ensure_backend(verbose: bool) -> None:
 
 
 _quiet_ref: list = []
+
+
+class GreedySampler(Sampler):
+    """Fast path for `temperature == 0`, which is argmax by definition.
+
+    `llama_sampler_sample` is O(vocab) with a large constant: it materialises a
+    `llama_token_data_array` of every token in the vocabulary — for Qwen2.5 that
+    is 151,936 entries, ~1.8 MB — on *every* call, then runs each sampler in the
+    chain over it. Profiling put it at 0.386 ms per call, which at 32 concurrent
+    sequences is 12.4 ms of a 36 ms decode step: 45% of the step spent deciding
+    something that is a single argmax.
+
+    This reads the logits buffer directly as a numpy view (no copy) and takes
+    the argmax. Repetition penalty is applied to only the tokens that are
+    actually in the recent window — at most `penalty_last_n` of them — instead
+    of sweeping the whole vocabulary, which is what llama.cpp's penalties
+    sampler does.
+
+    It is not an approximation. `scripts/verify_sampler.py` runs both against
+    the same logits on the real model and checks they pick the same token; its
+    output is committed under `results/`.
+    """
+
+    PENALTY_LAST_N = 64  # matches the window the chain path uses
+
+    def __init__(self, ctx, params: SamplingParams, n_vocab: int):
+        self._ctx = ctx
+        self._n_vocab = n_vocab
+        self._penalty = float(params.repeat_penalty or 1.0)
+        self._recent: deque[int] = deque(maxlen=self.PENALTY_LAST_N)
+        self._closed = False
+
+    def _logits(self, slot_index: int):
+        ptr = C.llama_get_logits_ith(self._ctx, slot_index)
+        return np.ctypeslib.as_array(ptr, shape=(self._n_vocab,))
+
+    def sample(self, slot_index: int) -> int:
+        logits = self._logits(slot_index)
+        if self._penalty == 1.0 or not self._recent:
+            return int(logits.argmax())
+
+        # Penalise in place over the handful of recent ids, take the argmax,
+        # then put the buffer back exactly as it was. Sampling happens on the
+        # scheduler thread only, and each sequence reads its own slot, so no
+        # other reader can observe the window in which it is modified.
+        ids = np.fromiter(set(self._recent), dtype=np.int32)
+        original = logits[ids].copy()
+        vals = original
+        # llama.cpp's rule: divide when positive, multiply when negative, so a
+        # penalty always moves a logit toward less likely.
+        logits[ids] = np.where(vals > 0, vals / self._penalty, vals * self._penalty)
+        best = int(logits.argmax())
+        logits[ids] = original
+        return best
+
+    def accept(self, token: int) -> None:
+        self._recent.append(int(token))
+
+    def close(self) -> None:
+        self._closed = True
 
 
 class LlamaCppSampler(Sampler):
@@ -81,10 +143,24 @@ class LlamaCppSampler(Sampler):
         self._closed = False
 
     def sample(self, slot_index: int) -> int:
+        # `llama_sampler_sample` calls `llama_sampler_accept` on the token it
+        # picked before returning it. That is why `accept` below is a no-op.
         return C.llama_sampler_sample(self._chain, self._ctx, slot_index)
 
     def accept(self, token: int) -> None:
-        C.llama_sampler_accept(self._chain, token)
+        """Deliberately a no-op: `sample()` already accepted this token.
+
+        Calling `llama_sampler_accept` here as well fed every token into the
+        penalty history *twice*, which silently halved the effective
+        `penalty_last_n` window from 64 tokens to 32. Found while checking the
+        greedy fast path against this one: the two disagreed on 7 of 320 tokens,
+        and the cause was the histories differing, not the arithmetic.
+        """
+
+    def restore_history(self, tokens: list[int]) -> None:
+        """Replay a resumed request's tokens into the chain's penalty history."""
+        for t in tokens:
+            C.llama_sampler_accept(self._chain, t)
 
     def close(self) -> None:
         if not self._closed:
@@ -101,6 +177,9 @@ class LlamaCppSampler(Sampler):
 class LlamaCppBackend(Backend):
     name = "llama.cpp"
     supports_prefix_sharing = True
+    # Greedy requests bypass llama.cpp's sampler chain. Set False to force every
+    # request through the chain, which is how the fast path is verified.
+    fast_greedy = True
 
     def __init__(
         self,
@@ -253,6 +332,8 @@ class LlamaCppBackend(Backend):
             self.tokens_decoded += len(slots)
 
     def make_sampler(self, params: SamplingParams) -> Sampler:
+        if params.temperature <= 0.0 and self.fast_greedy:
+            return GreedySampler(self._ctx, params, self.n_vocab)
         return LlamaCppSampler(self._ctx, params)
 
     # --- KV cache ---------------------------------------------------------

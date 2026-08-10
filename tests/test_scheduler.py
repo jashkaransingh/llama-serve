@@ -366,3 +366,31 @@ async def test_without_protection_the_same_workload_starves_it():
         "the low-priority request finished even without starvation protection; "
         "the load was not heavy enough for the guarantee test to mean anything"
     )
+
+
+# --- sampler history contract -----------------------------------------------
+def test_restore_history_replays_every_token():
+    """Resume depends on it: a sampler that starts with a blank penalty history
+    generates a different continuation than the one it is supposed to resume."""
+    from llama_serve.backends.mock import MockBackend
+
+    backend = MockBackend(max_seqs=1)
+    sampler = backend.make_sampler(SamplingParams(seed=1))
+    seen = []
+    sampler.accept = seen.append  # type: ignore[method-assign]
+    sampler.restore_history([5, 7, 9])
+    assert seen == [5, 7, 9]
+
+
+def test_engine_resume_uses_restore_history_not_accept():
+    """`accept` is a no-op for llama.cpp's sampler chain, because
+    `llama_sampler_sample` already accepted the token it returned. Resume has to
+    go through `restore_history`, which is not a no-op — otherwise a resumed
+    request silently loses its repetition-penalty history."""
+    import inspect
+
+    from llama_serve.engine import continuous
+
+    src = inspect.getsource(continuous.ContinuousBatchEngine._admit_locked)
+    assert "restore_history" in src
+    assert "sampler.accept" not in src
